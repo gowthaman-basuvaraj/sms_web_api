@@ -11,7 +11,7 @@ db.prepare(`
                                             text TEXT,
                                             sentStamp INTEGER,
                                             receivedStamp INTEGER,
-                                            sim TEXT
+                                            sim INTEGER
     )
 `).run();
 
