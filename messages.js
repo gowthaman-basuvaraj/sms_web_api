@@ -82,7 +82,7 @@ const init = async () => {
 
             try {
                 const query = db.prepare(`
-                    SELECT * FROM messages WHERE "sim" = ? ORDER BY sentStamp 
+                    SELECT * FROM messages WHERE sim = ? ORDER BY sentStamp 
                 `);
                 const messages = query.all(senderFrom);
                 return h.response({ status: 'success', messages }).code(200);
