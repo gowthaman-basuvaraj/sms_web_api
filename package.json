@@ -1,0 +1,19 @@
+{
+  "name": "web_message_api",
+  "version": "1.0.0",
+  "main": "messages.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@hapi/hapi": "^21.3.12",
+    "better-sqlite3": "^11.5.0",
+    "date-fns": "^4.1.0",
+    "sqlite3": "^5.1.7"
+  }
+}

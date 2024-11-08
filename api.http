@@ -1,0 +1,20 @@
+### API 1: Send Message
+POST http://localhost:3000/send-message
+Content-Type: application/json
+User-Agent: SMS Forwarder App
+
+{
+  "from": "Deepak",
+  "text": "Hello Deepak 1!",
+  "receivedStamp": 16330368899750,
+  "sim": "2365417894"
+}
+
+### API 2: Get All Messages (recent message of each User)
+GET http://localhost:3000/messages/recent
+
+### API 3: Get Sender's Message History
+GET http://localhost:3000/messages/1234567899
+
+
+
