@@ -10,7 +10,6 @@ db.prepare(`
                                             "from" TEXT,
                                             text TEXT,
                                             sentStamp TEXT,
-                                            receivedStamp TEXT,
                                             sim TEXT
     )
 `).run();
@@ -26,15 +25,15 @@ const init = async () => {
         method: 'POST',
         path: '/send-message',
         handler: (request, h) => {
-            const { from, text, receivedStamp, sim } = request.payload;
+            const { from, text, sim } = request.payload;
             const sentStamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a')
 
             try {
                 const insert = db.prepare(`
-                    INSERT INTO messages ("from", text, sentStamp, receivedStamp, sim)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO messages ("from", text, sentStamp, sim)
+                    VALUES (?, ?, ?, ?)
                 `);
-                insert.run(from, text, sentStamp, receivedStamp, sim);
+                insert.run(from, text, sentStamp, sim);
                 return h.response({ status: 'success', message: 'Message sent' }).code(200);
             } catch (error) {
                 console.error(error);
@@ -73,45 +72,49 @@ const init = async () => {
 
 
 
-    // API 3: Get Sender's Message History
+    // API 3: Get Sender's Message based on from and sim
     server.route({
         method: 'GET',
-        path: '/messages/from/{from}',
+        path: '/messages',
         handler: (request, h) => {
-            const senderFrom = request.params.from;
+            const { from, sim } = request.query;
 
             try {
-                const query = db.prepare(`
-                    SELECT * FROM messages WHERE "from" = ? ORDER BY sentStamp 
-                `);
-                const messages = query.all(senderFrom);
+                let query = `
+                SELECT m.*
+                FROM messages m
+                INNER JOIN (
+                    SELECT "from", MAX(sentStamp) AS latest_received
+                    FROM messages
+                    GROUP BY "from"
+                ) AS latest
+                ON m."from" = latest."from" AND m.sentStamp = latest.latest_received
+                WHERE 1=1
+            `;
+                const params = [];
+
+                if (from) {
+                    query += ' AND "from" = ?';
+                    params.push(from);
+                }
+
+                if (sim) {
+                    query += ' AND sim = ?';
+                    params.push(sim);
+                }
+
+                query += ' ORDER BY sentStamp DESC';
+
+                const messages = db.prepare(query).all(params);
+
                 return h.response({ status: 'success', messages }).code(200);
             } catch (error) {
                 console.error(error);
-                return h.response({ status: 'error', message: 'Failed to retrieve sender messages' }).code(500);
+                return h.response({ status: 'error', message: 'Failed to retrieve messages' }).code(500);
             }
         }
     });
 
-    // API 4: GET Based on SIM
-    server.route({
-        method: 'GET',
-        path: '/messages/sim/{sim}',
-        handler: (request, h) => {
-            const sim = request.params.sim.trim()
-
-            try {
-                const query = db.prepare(`
-                    SELECT * FROM messages WHERE sim = ? ORDER BY sentStamp
-                `);
-                const messages = query.all(sim);
-                return h.response({ status: 'success', messages }).code(200);
-            } catch (error) {
-                console.error(error);
-                return h.response({ status: 'error', message: 'Failed to retrieve messages by SIM' }).code(500);
-            }
-        }
-    });
 
 
     await server.start();

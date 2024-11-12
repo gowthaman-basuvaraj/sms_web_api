@@ -5,19 +5,22 @@ User-Agent: SMS Forwarder App
 
 {
   "from": "Ashwin",
-  "text": "Hello Ashwin latest!",
-  "receivedStamp": 123456789,
-  "sim": "SIM 2"
+  "text": "Hello Ashwin!",
+  "sim": "Jio"
 }
 
-### API 2: Get All Messages (recent message of each User)
-GET http://localhost:3000/messages/recent
+### Recent message of each user
+GET http://localhost:3000/messages
 
-### API 3: Get Sender's Message History
-GET http://localhost:3000/messages/from/Ashwin
+### Filter by sender
+GET http://localhost:3000/messages?from=Ashwin
 
-###API 4: Get Based on SIM
-GET http://localhost:3000/messages/sim/SIM2
+### Filter by SIM
+GET http://localhost:3000/messages?sim=Jio
+
+### Combined filters
+GET http://localhost:3000/messages?from=Ashwin&sim=Jio
+
 
 
 
