@@ -9,9 +9,9 @@ db.prepare(`
                                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                                             "from" TEXT,
                                             text TEXT,
-                                            sentStamp INTEGER,
-                                            receivedStamp INTEGER,
-                                            sim INTEGER
+                                            sentStamp TEXT,
+                                            receivedStamp TEXT,
+                                            sim TEXT
     )
 `).run();
 
@@ -76,13 +76,13 @@ const init = async () => {
     // API 3: Get Sender's Message History
     server.route({
         method: 'GET',
-        path: '/messages/{sim}',
+        path: '/messages/from/{from}',
         handler: (request, h) => {
-            const senderFrom = request.params.sim;
+            const senderFrom = request.params.from;
 
             try {
                 const query = db.prepare(`
-                    SELECT * FROM messages WHERE sim = ? ORDER BY sentStamp 
+                    SELECT * FROM messages WHERE "from" = ? ORDER BY sentStamp 
                 `);
                 const messages = query.all(senderFrom);
                 return h.response({ status: 'success', messages }).code(200);
@@ -92,6 +92,27 @@ const init = async () => {
             }
         }
     });
+
+    // API 4: GET Based on SIM
+    server.route({
+        method: 'GET',
+        path: '/messages/sim/{sim}',
+        handler: (request, h) => {
+            const sim = request.params.sim.trim()
+
+            try {
+                const query = db.prepare(`
+                    SELECT * FROM messages WHERE sim = ? ORDER BY sentStamp
+                `);
+                const messages = query.all(sim);
+                return h.response({ status: 'success', messages }).code(200);
+            } catch (error) {
+                console.error(error);
+                return h.response({ status: 'error', message: 'Failed to retrieve messages by SIM' }).code(500);
+            }
+        }
+    });
+
 
     await server.start();
     console.log('Server running on %s', server.info.uri);
