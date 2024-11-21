@@ -4,16 +4,16 @@ Content-Type: application/json
 User-Agent: SMS Forwarder App
 
 {
-  "from": "Ashwin",
-  "text": "Hello Ashwin!",
-  "sim": "Jio"
+  "sender": "Ashwin",
+  "text": "Hello Ashwin 3 !",
+  "sim": "Airtel"
 }
 
 ### Recent message of each user
-GET http://localhost:3000/messages
+GET http://localhost:3000/messages/recent
 
 ### Filter by sender
-GET http://localhost:3000/messages?from=Ashwin
+GET http://localhost:3000/messages?sender=Ashwin
 
 ### Filter by SIM
 GET http://localhost:3000/messages?sim=Jio
