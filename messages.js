@@ -100,7 +100,7 @@ const init = async () => {
                     params.push(sim);
                 }
 
-                query += " ORDER BY sentStamp DESC";
+                query += " ORDER BY sentStamp ASC";
 
                 const messages = db.prepare(query).all(params);
 
