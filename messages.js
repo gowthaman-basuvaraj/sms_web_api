@@ -1,6 +1,7 @@
 import Hapi from "@hapi/hapi";
 import Database from "better-sqlite3";
 import {format} from "date-fns";
+import {Server} from "socket.io";
 
 const db = new Database("./messages.db");
 
@@ -20,19 +21,34 @@ const init = async () => {
         host: "localhost",
         routes: {
             cors: {
-                origin: ["*"], // Allow all origins
-                additionalHeaders: ["cache-control", "x-requested-with"],
-            },
-        },
+                origin: ['*'], // Allow all origins
+                additionalHeaders: ['cache-control', 'x-requested-with']
+            }
+        }
     });
+
+    const io = new Server(server.listener, {
+        cors: {
+            origin: '*',
+            methods: ['GET', 'POST']
+        }
+    });
+
+    io.on('connection', (socket) => {
+        console.log('Client connected');
+    });
+
+    const broadcastMessage = (message) => {
+        io.emit('newMessage', message);
+    };
 
     // API 1: Send Message
     server.route({
-        method: "POST",
-        path: "/send-message",
+        method: 'POST',
+        path: '/send-message',
         handler: (request, h) => {
             const { sender, text, sim } = request.payload;
-            const sentStamp = format(new Date(), "dd/MM/yyyy hh:mm:ss a");
+            const sentStamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
 
             try {
                 const insert = db.prepare(`
@@ -40,18 +56,22 @@ const init = async () => {
                     VALUES (?, ?, ?, ?)
                 `);
                 insert.run(sender, text, sentStamp, sim);
-                return h.response({ status: "success", message: "Message sent" }).code(200);
+
+                const newMessage = { sender, text, sentStamp, sim };
+                broadcastMessage(newMessage);
+
+                return h.response({ status: 'success', message: 'Message sent' }).code(200);
             } catch (error) {
                 console.error(error);
-                return h.response({ status: "error", message: "Failed to send message" }).code(500);
+                return h.response({ status: 'error', message: 'Failed to send message' }).code(500);
             }
-        },
+        }
     });
 
     // API 2: Get Recent Messages
     server.route({
-        method: "GET",
-        path: "/messages/recent",
+        method: 'GET',
+        path: '/messages/recent',
         handler: (request, h) => {
             try {
                 const query = db.prepare(`
@@ -67,18 +87,18 @@ const init = async () => {
                 `);
 
                 const messages = query.all();
-                return h.response({ status: "success", messages }).code(200);
+                return h.response({ status: 'success', messages }).code(200);
             } catch (error) {
                 console.error(error);
-                return h.response({ status: "error", message: "Failed to retrieve recent messages" }).code(500);
+                return h.response({ status: 'error', message: 'Failed to retrieve recent messages' }).code(500);
             }
-        },
+        }
     });
 
     // API 3: Get Messages by Sender and SIM
     server.route({
-        method: "GET",
-        path: "/messages",
+        method: 'GET',
+        path: '/messages',
         handler: (request, h) => {
             const { sender, sim } = request.query;
 
@@ -91,33 +111,32 @@ const init = async () => {
                 const params = [];
 
                 if (sender) {
-                    query += " AND sender = ?";
+                    query += ' AND sender = ?';
                     params.push(sender);
                 }
 
                 if (sim) {
-                    query += " AND sim = ?";
+                    query += ' AND sim = ?';
                     params.push(sim);
                 }
 
-                query += " ORDER BY sentStamp ASC";
+                query += ' ORDER BY sentStamp ASC';
 
                 const messages = db.prepare(query).all(params);
 
-                return h.response({ status: "success", messages }).code(200);
+                return h.response({ status: 'success', messages }).code(200);
             } catch (error) {
                 console.error(error);
-                return h.response({ status: "error", message: "Failed to retrieve messages" }).code(500);
+                return h.response({ status: 'error', message: 'Failed to retrieve messages' }).code(500);
             }
-        },
+        }
     });
 
-
     await server.start();
-    console.log("Server running on %s", server.info.uri);
+    console.log('Server running on %s', server.info.uri);
 };
 
-process.on("unhandledRejection", (err) => {
+process.on('unhandledRejection', (err) => {
     console.error(err);
     process.exit(1);
 });

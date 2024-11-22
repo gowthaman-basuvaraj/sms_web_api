@@ -4,9 +4,9 @@ Content-Type: application/json
 User-Agent: SMS Forwarder App
 
 {
-  "sender": "Ashwin",
-  "text": "Hello Ashwin 8 latest message !",
-  "sim": "Airtel"
+  "sender": "Rohit",
+  "text": "Hello Rohit 5 !",
+  "sim": "Jio"
 }
 
 ### Recent message of each user
