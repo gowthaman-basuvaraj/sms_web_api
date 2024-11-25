@@ -48,7 +48,7 @@ const init = async () => {
         path: '/send-message',
         handler: (request, h) => {
             const { sender, text, sim } = request.payload;
-            const sentStamp = format(new Date(), 'dd/MM/yyyy hh:mm:ss a');
+            const sentStamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
 
             try {
                 const insert = db.prepare(`
@@ -75,15 +75,16 @@ const init = async () => {
         handler: (request, h) => {
             try {
                 const query = db.prepare(`
-                    SELECT m.*
-                    FROM messages m
-                             INNER JOIN (
-                        SELECT sender, MAX(sentStamp) AS latest_received
+                    WITH LatestMessages AS (
+                        SELECT sender, MAX(sentStamp) AS LatestTime
                         FROM messages
                         GROUP BY sender
-                    ) AS latest
-                                        ON m.sender = latest.sender AND m.sentStamp = latest.latest_received
-                    ORDER BY m.sentStamp DESC
+                    )
+                    SELECT m.*
+                    FROM messages m
+                             JOIN LatestMessages lm
+                                  ON m.sender = lm.sender AND m.sentStamp = lm.LatestTime
+                    ORDER BY m.sentStamp DESC;
                 `);
 
                 const messages = query.all();
@@ -120,7 +121,7 @@ const init = async () => {
                     params.push(sim);
                 }
 
-                query += ' ORDER BY sentStamp ASC';
+                query += ' ORDER BY sentStamp DESC';
 
                 const messages = db.prepare(query).all(params);
 
