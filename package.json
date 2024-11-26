@@ -14,8 +14,11 @@
     "@hapi/hapi": "^21.3.12",
     "better-sqlite3": "^11.5.0",
     "date-fns": "^4.1.0",
+    "keycloak": "^1.2.0",
+    "keycloak-connect": "^26.0.6",
     "nodemon": "^3.1.7",
     "socket.io": "^4.8.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "web_message_api": "file:"
   }
 }
