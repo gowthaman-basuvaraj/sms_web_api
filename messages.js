@@ -1,6 +1,6 @@
 import Hapi from "@hapi/hapi";
 import Database from "better-sqlite3";
-import {format} from "date-fns";
+import {format, subHours} from "date-fns";
 import {Server} from "socket.io";
 
 const db = new Database("./messages.db");
@@ -130,6 +130,21 @@ const init = async () => {
                 console.error(error);
                 return h.response({ status: 'error', message: 'Failed to retrieve messages' }).code(500);
             }
+        }
+    });
+
+    // run every hour to delete messages older than 48 hours
+    cron.schedule('0 * * * *', () => {
+        const cutoffDate = format(subHours(new Date(), 48), 'dd/MM/yyyy HH:mm:ss');
+        try {
+            const deleteOldMessages = db.prepare(`
+                DELETE FROM messages
+                WHERE sentStamp < ?
+            `);
+            const result = deleteOldMessages.run(cutoffDate);
+            console.log(`Deleted ${result.changes} old messages`);
+        } catch (error) {
+            console.error('Failed to delete old messages:', error);
         }
     });
 
