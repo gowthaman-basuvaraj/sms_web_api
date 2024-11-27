@@ -1,44 +1,36 @@
+import 'dotenv/config';
 import Hapi from "@hapi/hapi";
 import Database from "better-sqlite3";
-import { format } from "date-fns";
+import { format, subHours } from "date-fns";
 import { Server } from "socket.io";
+import cron from "node-cron";
+import config from "./config.js";
 
-const db = new Database("./messages.db");
+const db = new Database(config.database.path);
 
 db.prepare(
-  `
-    CREATE TABLE IF NOT EXISTS messages (
+    `
+      CREATE TABLE IF NOT EXISTS messages (
                                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                                             sender TEXT,
                                             text TEXT,
                                             sentStamp TEXT,
                                             sim TEXT
-    )
-`
+      )
+    `
 ).run();
 
 const init = async () => {
   const server = Hapi.server({
-    port: 3000,
-    host: "localhost",
+    port: config.server.port,
+    host: config.server.host,
     routes: {
-      cors: {
-        origin: ["http://localhost:5173"], // Allow only specific origins
-        additionalHeaders: [
-          "cache-control",
-          "x-requested-with",
-          "authorization",
-        ],
-        additionalExposedHeaders: ["content-type"],
-      },
+      cors: config.server.cors,
     },
   });
 
   const io = new Server(server.listener, {
-    cors: {
-      origin: "*",
-      methods: ["GET", "POST"],
-    },
+    cors: config.socket.cors,
   });
 
   io.on("connection", (socket) => {
@@ -59,22 +51,22 @@ const init = async () => {
 
       try {
         const insert = db.prepare(`
-                    INSERT INTO messages (sender, text, sentStamp, sim)
-                    VALUES (?, ?, ?, ?)
-                `);
+          INSERT INTO messages (sender, text, sentStamp, sim)
+          VALUES (?, ?, ?, ?)
+        `);
         insert.run(sender, text, sentStamp, sim);
 
         const newMessage = { sender, text, sentStamp, sim };
         broadcastMessage(newMessage);
 
         return h
-          .response({ status: "success", message: "Message sent" })
-          .code(200);
+            .response({ status: "success", message: "Message sent" })
+            .code(200);
       } catch (error) {
         console.error(error);
         return h
-          .response({ status: "error", message: "Failed to send message" })
-          .code(500);
+            .response({ status: "error", message: "Failed to send message" })
+            .code(500);
       }
     },
   });
@@ -86,28 +78,28 @@ const init = async () => {
     handler: (request, h) => {
       try {
         const query = db.prepare(`
-                    WITH LatestMessages AS (
-                        SELECT sender, MAX(sentStamp) AS LatestTime
-                        FROM messages
-                        GROUP BY sender
-                    )
-                    SELECT m.*
-                    FROM messages m
-                             JOIN LatestMessages lm
-                                  ON m.sender = lm.sender AND m.sentStamp = lm.LatestTime
-                    ORDER BY m.sentStamp DESC;
-                `);
+          WITH LatestMessages AS (
+            SELECT sender, MAX(sentStamp) AS LatestTime
+            FROM messages
+            GROUP BY sender
+          )
+          SELECT m.*
+          FROM messages m
+                 JOIN LatestMessages lm
+                      ON m.sender = lm.sender AND m.sentStamp = lm.LatestTime
+          ORDER BY m.sentStamp DESC;
+        `);
 
         const messages = query.all();
         return h.response({ status: "success", messages }).code(200);
       } catch (error) {
         console.error(error);
         return h
-          .response({
-            status: "error",
-            message: "Failed to retrieve recent messages",
-          })
-          .code(500);
+            .response({
+              status: "error",
+              message: "Failed to retrieve recent messages",
+            })
+            .code(500);
       }
     },
   });
@@ -121,10 +113,10 @@ const init = async () => {
 
       try {
         let query = `
-                    SELECT *
-                    FROM messages
-                    WHERE 1=1
-                `;
+          SELECT *
+          FROM messages
+          WHERE 1=1
+        `;
         const params = [];
 
         if (sender) {
@@ -145,13 +137,13 @@ const init = async () => {
       } catch (error) {
         console.error(error);
         return h
-          .response({ status: "error", message: "Failed to retrieve messages" })
-          .code(500);
+            .response({ status: "error", message: "Failed to retrieve messages" })
+            .code(500);
       }
     },
   });
 
-  // APi 4: add user
+  // API 4: Add User
   server.route({
     method: "POST",
     path: "/user",
@@ -159,26 +151,44 @@ const init = async () => {
       try {
         const { name, role } = req.payload;
         const checkUser = db.prepare(
-          `SELECT COUNT(*) as count FROM users WHERE username = ?`
+            `SELECT COUNT(*) as count FROM users WHERE username = ?`
         );
         const existingUser = checkUser.get(name);
 
         if (existingUser.count === 0) {
           const insert = db.prepare(`
-                    INSERT INTO users (username, role) VALUES (?, ?)
-                `);
+            INSERT INTO users (username, role) VALUES (?, ?)
+          `);
           insert.run(name, role);
         }
         return h
-          .response({ status: "success", message: "user added successfully" })
-          .code(200);
+            .response({ status: "success", message: "User added successfully" })
+            .code(200);
       } catch (error) {
         console.error(error);
         return h
-          .response({ status: "error", message: "Failed to add user" })
-          .code(500);
+            .response({ status: "error", message: "Failed to add user" })
+            .code(500);
       }
     },
+  });
+
+  // Run every hour to delete messages older than 48 hours
+  cron.schedule(config.cron.schedule, () => {
+    const cutoffDate = format(
+        subHours(new Date(), config.cron.retentionPeriodHours),
+        "dd/MM/yyyy HH:mm:ss"
+    );
+    try {
+      const deleteOldMessages = db.prepare(`
+        DELETE FROM messages
+        WHERE sentStamp < ?
+      `);
+      const result = deleteOldMessages.run(cutoffDate);
+      console.log(`Deleted ${result.changes} old messages`);
+    } catch (error) {
+      console.error("Failed to delete old messages:", error);
+    }
   });
 
   await server.start();
