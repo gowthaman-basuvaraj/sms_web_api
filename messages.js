@@ -46,8 +46,16 @@ const init = async () => {
     method: "POST",
     path: "/send-message",
     handler: (request, h) => {
-      const { sender, text, sim } = request.payload;
+      let { sender, text, sim } = request.payload;
       const sentStamp = format(new Date(), "dd/MM/yyyy HH:mm:ss");
+
+      if (sender.length > 3) {
+        const remainingSender = sender.slice(3);
+        const pattern = /^[a-zA-Z]{2}-/; //  2 alphabet followed by a hyphen
+        if (pattern.test(sender) && remainingSender.length > 0) {
+          sender = remainingSender;
+        }
+      }
 
       try {
         const insert = db.prepare(`

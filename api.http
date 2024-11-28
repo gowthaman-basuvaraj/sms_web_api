@@ -4,9 +4,9 @@ Content-Type: application/json
 User-Agent: SMS Forwarder App
 
 {
-  "sender": "Gowthaman",
-  "text": "This is latest 19!",
-  "sim": "Jio"
+  "sender": "IM-PNBANK",
+  "text": "Your FD of 50000 has matured. Please visit the branch for further details.",
+  "sim": "Vodafone"
 }
 
 ### Recent message of each user
