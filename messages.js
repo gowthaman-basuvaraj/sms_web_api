@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import "dotenv/config";
 import Hapi from "@hapi/hapi";
 import Database from "better-sqlite3";
 import { format, subHours } from "date-fns";
@@ -9,7 +9,7 @@ import config from "./config.js";
 const db = new Database(config.database.path);
 
 db.prepare(
-    `
+  `
       CREATE TABLE IF NOT EXISTS messages (
                                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                                             sender TEXT,
@@ -18,6 +18,17 @@ db.prepare(
                                             sim TEXT
       )
     `
+).run();
+
+db.prepare(
+  `
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL,
+    mute BOOLEAN DEFAULT FALSE
+  );
+  `
 ).run();
 
 const init = async () => {
@@ -68,13 +79,13 @@ const init = async () => {
         broadcastMessage(newMessage);
 
         return h
-            .response({ status: "success", message: "Message sent" })
-            .code(200);
+          .response({ status: "success", message: "Message sent" })
+          .code(200);
       } catch (error) {
         console.error(error);
         return h
-            .response({ status: "error", message: "Failed to send message" })
-            .code(500);
+          .response({ status: "error", message: "Failed to send message" })
+          .code(500);
       }
     },
   });
@@ -103,11 +114,11 @@ const init = async () => {
       } catch (error) {
         console.error(error);
         return h
-            .response({
-              status: "error",
-              message: "Failed to retrieve recent messages",
-            })
-            .code(500);
+          .response({
+            status: "error",
+            message: "Failed to retrieve recent messages",
+          })
+          .code(500);
       }
     },
   });
@@ -145,8 +156,8 @@ const init = async () => {
       } catch (error) {
         console.error(error);
         return h
-            .response({ status: "error", message: "Failed to retrieve messages" })
-            .code(500);
+          .response({ status: "error", message: "Failed to retrieve messages" })
+          .code(500);
       }
     },
   });
@@ -159,7 +170,7 @@ const init = async () => {
       try {
         const { name, role } = req.payload;
         const checkUser = db.prepare(
-            `SELECT COUNT(*) as count FROM users WHERE username = ?`
+          `SELECT COUNT(*) as count FROM users WHERE username = ?`
         );
         const existingUser = checkUser.get(name);
 
@@ -170,13 +181,13 @@ const init = async () => {
           insert.run(name, role);
         }
         return h
-            .response({ status: "success", message: "User added successfully" })
-            .code(200);
+          .response({ status: "success", message: "User added successfully" })
+          .code(200);
       } catch (error) {
         console.error(error);
         return h
-            .response({ status: "error", message: "Failed to add user" })
-            .code(500);
+          .response({ status: "error", message: "Failed to add user" })
+          .code(500);
       }
     },
   });
@@ -184,8 +195,8 @@ const init = async () => {
   // Run every hour to delete messages older than 48 hours
   cron.schedule(config.cron.schedule, () => {
     const cutoffDate = format(
-        subHours(new Date(), config.cron.retentionPeriodHours),
-        "dd/MM/yyyy HH:mm:ss"
+      subHours(new Date(), config.cron.retentionPeriodHours),
+      "dd/MM/yyyy HH:mm:ss"
     );
     try {
       const deleteOldMessages = db.prepare(`
