@@ -25,9 +25,21 @@ db.prepare(
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL,
-    mute BOOLEAN DEFAULT FALSE
-  );
+    role TEXT NOT NULL
+  )
+  `
+).run();
+
+db.prepare(
+  `
+                    CREATE TABLE IF NOT EXISTS userPreferences (
+                              id INTEGER PRIMARY KEY AUTOINCREMENT,
+                              user_id INTEGER,
+                              sender_name TEXT,
+                              mutePreferences BOOLEAN DEFAULT 0,
+                              FOREIGN KEY (user_id) REFERENCES users(id),
+                              FOREIGN KEY (sender_name) REFERENCES messages(sender)
+                    )
   `
 ).run();
 
@@ -187,6 +199,33 @@ const init = async () => {
         console.error(error);
         return h
           .response({ status: "error", message: "Failed to add user" })
+          .code(500);
+      }
+    },
+  });
+
+  // API 5: Add User Preference
+  server.route({
+    method: "POST",
+    path: "/user/preference",
+    handler: (req, h) => {
+      try {
+        const { userId, senderName, mutePreferences } = req.payload;
+        const insert = db.prepare(`
+          INSERT INTO userPreferences (user_id, sender_name, mutePreferences)
+          VALUES (?,?,?)
+        `);
+        insert.run(userId, senderName, mutePreferences);
+        return h
+         .response({ status: "success", message: "User preference added successfully" })
+         .code(200);
+      } catch (error) {
+        console.error(error);
+        return h
+          .response({
+            status: "error",
+            message: "Failed to add user preference",
+          })
           .code(500);
       }
     },
