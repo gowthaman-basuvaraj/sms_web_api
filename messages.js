@@ -36,9 +36,8 @@ db.prepare(
                               id INTEGER PRIMARY KEY AUTOINCREMENT,
                               user_id INTEGER,
                               sender_name TEXT,
-                              mutePreferences BOOLEAN DEFAULT 0,
-                              FOREIGN KEY (user_id) REFERENCES users(id),
-                              FOREIGN KEY (sender_name) REFERENCES messages(sender)
+                              mutePreferences BOOLEAN DEFAULT 1,
+                              FOREIGN KEY (user_id) REFERENCES users(id)
                     )
   `
 ).run();
@@ -69,7 +68,7 @@ const init = async () => {
     method: "POST",
     path: "/send-message",
     handler: (request, h) => {
-      let { sender, text, sim } = request.payload;
+      let { userName, sender, text, sim } = request.payload;
       const sentStamp = format(new Date(), "dd/MM/yyyy HH:mm:ss");
 
       if (sender.length > 3) {
@@ -81,11 +80,33 @@ const init = async () => {
       }
 
       try {
+        const userId = db
+          .prepare(`SELECT id FROM users WHERE username =?`)
+          .get(userName);
+
+        if (!userId) {
+          return h.response({
+            status: "error",
+            message: "User to which messagae is sent does not exist",
+          });
+        }
         const insert = db.prepare(`
           INSERT INTO messages (sender, text, sentStamp, sim)
           VALUES (?, ?, ?, ?)
         `);
         insert.run(sender, text, sentStamp, sim);
+
+        const senderPresent = db
+          .prepare(
+            `SELECT * FROM userPreferences WHERE user_id =? AND sender_name =?`
+          )
+          .get(userId.id, sender);
+
+        if (!senderPresent) {
+          const insertPreferenceQuery = `INSERT INTO userPreferences (user_id, sender_name, mutePreferences) VALUES (?, ?, ?)`;
+          console.log("Insert Preference Query:", insertPreferenceQuery);
+          db.prepare(insertPreferenceQuery).run(userId.id, sender, 1);
+        }
 
         const newMessage = { sender, text, sentStamp, sim };
         broadcastMessage(newMessage);
@@ -211,20 +232,63 @@ const init = async () => {
     handler: (req, h) => {
       try {
         const { userId, senderName, mutePreferences } = req.payload;
+        const muteValue = mutePreferences === "true" ? 1 : 0;
         const insert = db.prepare(`
           INSERT INTO userPreferences (user_id, sender_name, mutePreferences)
           VALUES (?,?,?)
         `);
-        insert.run(userId, senderName, mutePreferences);
+        insert.run(userId, senderName, muteValue);
         return h
-         .response({ status: "success", message: "User preference added successfully" })
-         .code(200);
+          .response({
+            status: "success",
+            message: "User preference added successfully",
+            mutePreferences: mutePreferences,
+          })
+          .code(200);
       } catch (error) {
         console.error(error);
         return h
           .response({
             status: "error",
             message: "Failed to add user preference",
+          })
+          .code(500);
+      }
+    },
+  });
+
+  // API 6: Get User Preferences
+  server.route({
+    method: "GET",
+    path: "/user/preferences",
+    handler: (req, h) => {
+      const { userName, sender } = req.query;
+      try {
+        const userId = db
+          .prepare(`SELECT id FROM users WHERE username =?`)
+          .get(userName);
+
+        console.log("User ID:", userId);
+        console.log("Sender:", sender);
+        if (!userId) {
+          return h
+            .response({ status: "error", message: "User not found" })
+            .code(404);
+        }
+        const query = db.prepare(`
+          SELECT *
+          FROM userPreferences
+          WHERE user_id =? AND sender_name =?
+        `);
+        const preferences = query.all(userId.id, sender);
+        console.log("Preferences:", preferences);
+        return h.response({ status: "success", preferences }).code(200);
+      } catch (error) {
+        console.error(error);
+        return h
+          .response({
+            status: "error",
+            message: "Failed to retrieve user preferences",
           })
           .code(500);
       }
