@@ -85,10 +85,12 @@ const init = async () => {
           .get(userName);
 
         if (!userId) {
-          return h.response({
-            status: "error",
-            message: "User to which messagae is sent does not exist",
-          });
+          return h
+            .response({
+              status: "error",
+              message: "User to which messagae is sent does not exist",
+            })
+            .statusCode(404);
         }
         const insert = db.prepare(`
           INSERT INTO messages (sender, text, sentStamp, sim)
@@ -231,13 +233,34 @@ const init = async () => {
     path: "/user/preference",
     handler: (req, h) => {
       try {
-        const { userId, senderName, mutePreferences } = req.payload;
-        const muteValue = mutePreferences === "true" ? 1 : 0;
-        const insert = db.prepare(`
-          INSERT INTO userPreferences (user_id, sender_name, mutePreferences)
-          VALUES (?,?,?)
-        `);
-        insert.run(userId, senderName, muteValue);
+        const { userName, senderName, mutePreferences } = req.payload;
+
+        const userId = db
+          .prepare(`SELECT id FROM users WHERE username =?`)
+          .get(userName);
+
+        const muteValue = mutePreferences ? 1 : 0;
+
+        const senderPresent = db
+          .prepare(
+            `SELECT * FROM userPreferences WHERE user_id =? AND sender_name =?`
+          )
+          .get(userId.id, senderName);
+
+        if (!senderPresent) {
+          return h
+            .response({
+              status: "error",
+              message: "sender to which preference is added does not exist",
+            })
+            .statusCode(404);
+        }
+
+        const insertPreferenceQuery = `UPDATE userPreferences SET mutePreferences =? WHERE user_id =? AND sender_name =?`;
+        db.prepare(insertPreferenceQuery).run(muteValue, userId.id, senderName);
+
+        console.log("Mute Value:", muteValue, insertPreferenceQuery);
+
         return h
           .response({
             status: "success",
