@@ -68,7 +68,7 @@ const init = async () => {
     method: "POST",
     path: "/send-message",
     handler: (request, h) => {
-      let { userName, sender, text, sim } = request.payload;
+      let { sender, text, sim } = request.payload;
       const sentStamp = format(new Date(), "dd/MM/yyyy HH:mm:ss");
 
       if (sender.length > 3) {
@@ -80,47 +80,23 @@ const init = async () => {
       }
 
       try {
-        const userId = db
-          .prepare(`SELECT id FROM users WHERE username =?`)
-          .get(userName);
-
-        if (!userId) {
-          return h
-            .response({
-              status: "error",
-              message: "User to which messagae is sent does not exist",
-            })
-            .statusCode(404);
-        }
         const insert = db.prepare(`
           INSERT INTO messages (sender, text, sentStamp, sim)
           VALUES (?, ?, ?, ?)
         `);
         insert.run(sender, text, sentStamp, sim);
 
-        const senderPresent = db
-          .prepare(
-            `SELECT * FROM userPreferences WHERE user_id =? AND sender_name =?`
-          )
-          .get(userId.id, sender);
-
-        if (!senderPresent) {
-          const insertPreferenceQuery = `INSERT INTO userPreferences (user_id, sender_name, mutePreferences) VALUES (?, ?, ?)`;
-          console.log("Insert Preference Query:", insertPreferenceQuery);
-          db.prepare(insertPreferenceQuery).run(userId.id, sender, 1);
-        }
-
         const newMessage = { sender, text, sentStamp, sim };
         broadcastMessage(newMessage);
 
         return h
-          .response({ status: "success", message: "Message sent" })
-          .code(200);
+            .response({ status: "success", message: "Message sent" })
+            .code(200);
       } catch (error) {
         console.error(error);
         return h
-          .response({ status: "error", message: "Failed to send message" })
-          .code(500);
+            .response({ status: "error", message: "Failed to send message" })
+            .code(500);
       }
     },
   });
