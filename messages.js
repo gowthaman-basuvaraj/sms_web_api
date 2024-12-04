@@ -9,37 +9,38 @@ import config from "./config.js";
 const db = new Database(config.database.path);
 
 db.prepare(
-  `
+    `
       CREATE TABLE IF NOT EXISTS messages (
                                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                                             sender TEXT,
                                             text TEXT,
                                             sentStamp TEXT,
-                                            sim TEXT
+                                            sim TEXT,
+                                            isRead BOOLEAN DEFAULT 0
       )
     `
 ).run();
 
 db.prepare(
-  `
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL
-  )
-  `
+    `
+      CREATE TABLE IF NOT EXISTS users (
+                                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                         username TEXT UNIQUE NOT NULL,
+                                         role TEXT NOT NULL
+      )
+    `
 ).run();
 
 db.prepare(
-  `
-                    CREATE TABLE IF NOT EXISTS userPreferences (
-                              id INTEGER PRIMARY KEY AUTOINCREMENT,
-                              user_id INTEGER,
-                              sender_name TEXT,
-                              mutePreferences BOOLEAN DEFAULT 1,
-                              FOREIGN KEY (user_id) REFERENCES users(id)
-                    )
-  `
+    `
+      CREATE TABLE IF NOT EXISTS userPreferences (
+                                                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                   user_id INTEGER,
+                                                   sender_name TEXT,
+                                                   mutePreferences BOOLEAN DEFAULT 1,
+                                                   FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `
 ).run();
 
 const init = async () => {
@@ -73,7 +74,7 @@ const init = async () => {
 
       if (sender.length > 3) {
         const remainingSender = sender.slice(3);
-        const pattern = /^[a-zA-Z]{2}-/; //  2 alphabet followed by a hyphen
+        const pattern = /^[a-zA-Z]{2}-/; // 2 alphabet followed by a hyphen
         if (pattern.test(sender) && remainingSender.length > 0) {
           sender = remainingSender;
         }
@@ -81,12 +82,12 @@ const init = async () => {
 
       try {
         const insert = db.prepare(`
-          INSERT INTO messages (sender, text, sentStamp, sim)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO messages (sender, text, sentStamp, sim, isRead)
+          VALUES (?, ?, ?, ?, 0)
         `);
         insert.run(sender, text, sentStamp, sim);
 
-        const newMessage = { sender, text, sentStamp, sim };
+        const newMessage = { sender, text, sentStamp, sim, isRead: 0 };
         broadcastMessage(newMessage);
 
         return h
@@ -125,11 +126,11 @@ const init = async () => {
       } catch (error) {
         console.error(error);
         return h
-          .response({
-            status: "error",
-            message: "Failed to retrieve recent messages",
-          })
-          .code(500);
+            .response({
+              status: "error",
+              message: "Failed to retrieve recent messages",
+            })
+            .code(500);
       }
     },
   });
@@ -167,8 +168,8 @@ const init = async () => {
       } catch (error) {
         console.error(error);
         return h
-          .response({ status: "error", message: "Failed to retrieve messages" })
-          .code(500);
+            .response({ status: "error", message: "Failed to retrieve messages" })
+            .code(500);
       }
     },
   });
@@ -181,7 +182,7 @@ const init = async () => {
       try {
         const { name, role } = req.payload;
         const checkUser = db.prepare(
-          `SELECT COUNT(*) as count FROM users WHERE username = ?`
+            `SELECT COUNT(*) as count FROM users WHERE username = ?`
         );
         const existingUser = checkUser.get(name);
 
@@ -192,13 +193,13 @@ const init = async () => {
           insert.run(name, role);
         }
         return h
-          .response({ status: "success", message: "User added successfully" })
-          .code(200);
+            .response({ status: "success", message: "User added successfully" })
+            .code(200);
       } catch (error) {
         console.error(error);
         return h
-          .response({ status: "error", message: "Failed to add user" })
-          .code(500);
+            .response({ status: "error", message: "Failed to add user" })
+            .code(500);
       }
     },
   });
@@ -212,24 +213,24 @@ const init = async () => {
         const { userName, senderName, mutePreferences } = req.payload;
 
         const userId = db
-          .prepare(`SELECT id FROM users WHERE username =?`)
-          .get(userName);
+            .prepare(`SELECT id FROM users WHERE username =?`)
+            .get(userName);
 
         const muteValue = mutePreferences ? 1 : 0;
 
         const senderPresent = db
-          .prepare(
-            `SELECT * FROM userPreferences WHERE user_id =? AND sender_name =?`
-          )
-          .get(userId.id, senderName);
+            .prepare(
+                `SELECT * FROM userPreferences WHERE user_id =? AND sender_name =?`
+            )
+            .get(userId.id, senderName);
 
         if (!senderPresent) {
           return h
-            .response({
-              status: "error",
-              message: "sender to which preference is added does not exist",
-            })
-            .statusCode(404);
+              .response({
+                status: "error",
+                message: "sender to which preference is added does not exist",
+              })
+              .statusCode(404);
         }
 
         const insertPreferenceQuery = `UPDATE userPreferences SET mutePreferences =? WHERE user_id =? AND sender_name =?`;
@@ -238,20 +239,20 @@ const init = async () => {
         console.log("Mute Value:", muteValue, insertPreferenceQuery);
 
         return h
-          .response({
-            status: "success",
-            message: "User preference added successfully",
-            mutePreferences: mutePreferences,
-          })
-          .code(200);
+            .response({
+              status: "success",
+              message: "User preference added successfully",
+              mutePreferences: mutePreferences,
+            })
+            .code(200);
       } catch (error) {
         console.error(error);
         return h
-          .response({
-            status: "error",
-            message: "Failed to add user preference",
-          })
-          .code(500);
+            .response({
+              status: "error",
+              message: "Failed to add user preference",
+            })
+            .code(500);
       }
     },
   });
@@ -264,15 +265,15 @@ const init = async () => {
       const { userName, sender } = req.query;
       try {
         const userId = db
-          .prepare(`SELECT id FROM users WHERE username =?`)
-          .get(userName);
+            .prepare(`SELECT id FROM users WHERE username =?`)
+            .get(userName);
 
         console.log("User ID:", userId);
         console.log("Sender:", sender);
         if (!userId) {
           return h
-            .response({ status: "error", message: "User not found" })
-            .code(404);
+              .response({ status: "error", message: "User not found" })
+              .code(404);
         }
         const query = db.prepare(`
           SELECT *
@@ -285,11 +286,32 @@ const init = async () => {
       } catch (error) {
         console.error(error);
         return h
-          .response({
-            status: "error",
-            message: "Failed to retrieve user preferences",
-          })
-          .code(500);
+            .response({
+              status: "error",
+              message: "Failed to retrieve user preferences",
+            })
+            .code(500);
+      }
+    },
+  });
+
+  // API 7: Mark Messages as Read
+  server.route({
+    method: "POST",
+    path: "/messages/mark-as-read",
+    handler: (request, h) => {
+      const { sender } = request.payload;
+      try {
+        const update = db.prepare(`
+          UPDATE messages
+          SET isRead = 1
+          WHERE sender = ?
+        `);
+        update.run(sender);
+        return h.response({ status: "success", message: "Messages marked as read" }).code(200);
+      } catch (error) {
+        console.error(error);
+        return h.response({ status: "error", message: "Failed to mark messages as read" }).code(500);
       }
     },
   });
@@ -297,8 +319,8 @@ const init = async () => {
   // Run every hour to delete messages older than 48 hours
   cron.schedule(config.cron.schedule, () => {
     const cutoffDate = format(
-      subHours(new Date(), config.cron.retentionPeriodHours),
-      "dd/MM/yyyy HH:mm:ss"
+        subHours(new Date(), config.cron.retentionPeriodHours),
+        "dd/MM/yyyy HH:mm:ss"
     );
     try {
       const deleteOldMessages = db.prepare(`
