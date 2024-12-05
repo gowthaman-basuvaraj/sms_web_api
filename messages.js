@@ -114,7 +114,8 @@ const init = async () => {
             FROM messages
             GROUP BY sender
           )
-          SELECT m.*
+          SELECT m.*,
+                 (SELECT COUNT(*) FROM messages WHERE sender = m.sender AND isRead = 0) AS unreadCount
           FROM messages m
                  JOIN LatestMessages lm
                       ON m.sender = lm.sender AND m.sentStamp = lm.LatestTime
