@@ -8,40 +8,37 @@ import config from "./config.js";
 
 const db = new Database(config.database.path);
 
+// language=SQLite
 db.prepare(
-  `
-      CREATE TABLE IF NOT EXISTS messages (
-                                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                            sender TEXT,
-                                            text TEXT,
-                                            sentStamp TEXT,
-                                            sim TEXT,
-                                            isRead BOOLEAN DEFAULT 0
-      )
-    `
-).run();
+  `CREATE TABLE IF NOT EXISTS messages
+   (
+       id        INTEGER PRIMARY KEY AUTOINCREMENT,
+       sender    TEXT,
+       text      TEXT,
+       sentStamp TEXT,
+       sim       TEXT,
+       isRead    BOOLEAN DEFAULT 0
+   )`).run();
 
+// language=SQLite
 db.prepare(
-  `
-      CREATE TABLE IF NOT EXISTS users (
-                                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                         username TEXT UNIQUE NOT NULL,
-                                         role TEXT NOT NULL
-      )
-    `
-).run();
+  `CREATE TABLE IF NOT EXISTS users
+   (
+     id       INTEGER PRIMARY KEY AUTOINCREMENT,
+     username TEXT UNIQUE NOT NULL,
+     role     TEXT        NOT NULL
+   )`).run();
 
+// language=SQLite
 db.prepare(
-  `
-      CREATE TABLE IF NOT EXISTS userPreferences (
-                                                   id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                                   user_id INTEGER,
-                                                   sender_name TEXT,
-                                                   mutePreferences BOOLEAN DEFAULT 1,
-                                                   FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    `
-).run();
+  `CREATE TABLE IF NOT EXISTS userPreferences
+   (
+       id              INTEGER PRIMARY KEY AUTOINCREMENT,
+       user_id         INTEGER,
+       sender_name     TEXT,
+       mutePreferences BOOLEAN DEFAULT 1,
+       FOREIGN KEY (user_id) REFERENCES users (id)
+   )`).run();
 
 const init = async () => {
   const server = Hapi.server({

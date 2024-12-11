@@ -4,8 +4,8 @@ Content-Type: application/json
 User-Agent: SMS Forwarder App
 
 {
-  "sender": "IM-PNBANK",
-  "text": "Your FD of 50000 has matured. Please visit the branch for further details.",
+  "sender": "IM-AIRBIL",
+  "text": "your airtel bill is Rs 500/-",
   "sim": "Vodafone"
 }
 
