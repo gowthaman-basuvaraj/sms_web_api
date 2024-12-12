@@ -4,8 +4,9 @@ Content-Type: application/json
 User-Agent: SMS Forwarder App
 
 {
-  "sender": "IM-AIRBIL",
-  "text": "your airtel bill is Rs 500/-",
+  "userName": "demo2",
+  "sender": "IM-AXISBK",
+  "text": "your OTP is 23453456",
   "sim": "Vodafone"
 }
 
