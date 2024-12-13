@@ -5,6 +5,7 @@ import { format, subHours } from "date-fns";
 import { Server } from "socket.io";
 import cron from "node-cron";
 import config from "./config.js";
+import authMiddleware from "./authMiddleware.js";
 
 const db = new Database(config.database.path);
 
@@ -60,6 +61,8 @@ const init = async () => {
   const broadcastMessage = (message) => {
     io.emit("newMessage", message);
   };
+
+  // server.ext('onRequest', authMiddleware);
 
   // API 1: Send Message
   server.route({
