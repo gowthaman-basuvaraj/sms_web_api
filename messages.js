@@ -62,7 +62,7 @@ const init = async () => {
     io.emit("newMessage", message);
   };
 
-  // server.ext('onRequest', authMiddleware);
+  server.ext('onRequest', authMiddleware);
 
   // API 1: Send Message
   server.route({
