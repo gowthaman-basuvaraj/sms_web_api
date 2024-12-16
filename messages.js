@@ -88,7 +88,7 @@ const init = async () => {
         if (!userId) {
           return h.response({
             status: "error",
-            message: "User to which messagae is sent does not exist",
+            message: "User to which message is sent does not exist",
           });
         }
 
