@@ -21,6 +21,10 @@ const getKey = (header) => {
 
 const authMiddleware = async (request, h) => {
     const authHeader = request.headers.authorization;
+    if(request.method.toLowerCase() === "options"){
+        console.log('skipAuth check for Options')
+        return h.continue;
+    }
     if (!authHeader) {
         console.log("No token provided");
         return h.response({ status: 'error', message: 'No token provided' }).code(401).takeover();
@@ -30,7 +34,9 @@ const authMiddleware = async (request, h) => {
     // console.log("Token", token)
 
     try {
-        const key = await getKey(jwt.decode(token, { complete: true }).header);
+        let decoded0 = jwt.decode(token, { complete: true });
+        console.log('decoded', decoded0)
+        const key = await getKey(decoded0.header);
         const decoded = jwt.verify(token, key, { algorithms: ['RS256'] });
         console.log("Decoded Token:", decoded);
         request.user = decoded;
