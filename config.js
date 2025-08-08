@@ -1,6 +1,6 @@
 export default {
     jwt: {
-        jwksUri: 'https://auth.readymixerp.com/realms/rmc-dev/protocol/openid-connect/certs',
+        jwksUri: '<insert>',
     },
     server: {
         port: process.env.SERVER_PORT || 3000,
