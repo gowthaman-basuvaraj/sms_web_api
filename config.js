@@ -9,9 +9,18 @@ const derivedJwksUri =
     ? `${keycloakUrl.replace(/\/$/, "")}/realms/${keycloakRealm}/protocol/openid-connect/certs`
     : undefined;
 
+// Expected token issuer (Keycloak `iss`). When set, tokens from other realms are rejected.
+const derivedIssuer =
+  keycloakUrl && keycloakRealm
+    ? `${keycloakUrl.replace(/\/$/, "")}/realms/${keycloakRealm}`
+    : undefined;
+
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+
 export default {
     jwt: {
         jwksUri: process.env.KEYCLOAK_JWKS_URI || derivedJwksUri,
+        issuer: process.env.KEYCLOAK_ISSUER || derivedIssuer || null,
         // Optional realm role required to access the API. When unset, any valid token is
         // accepted; when set (e.g. READ_SMS), callers must hold that realm role.
         requiredRole: process.env.REALM_ACCESS || null,
@@ -20,7 +29,7 @@ export default {
         port: process.env.SERVER_PORT || 3000,
         host: process.env.SERVER_HOST || "localhost",
         cors: {
-            origin: [process.env.CORS_ORIGIN || "http://localhost:5173"],
+            origin: [corsOrigin],
             additionalHeaders: ["cache-control", "x-requested-with", "authorization"],
             additionalExposedHeaders: ["content-type"],
         },
@@ -30,7 +39,9 @@ export default {
     },
     socket: {
         cors: {
-            origin: "*",
+            // Restrict the realtime channel to the web app origin (was "*", which let any
+            // site subscribe to broadcast messages).
+            origin: corsOrigin,
             methods: ["GET", "POST"],
         },
     },
