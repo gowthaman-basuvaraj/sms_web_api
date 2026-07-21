@@ -5,7 +5,7 @@ import { format, subHours } from "date-fns";
 import { Server } from "socket.io";
 import cron from "node-cron";
 import config from "./config.js";
-import authMiddleware from "./authMiddleware.js";
+import authMiddleware, { authenticateToken } from "./authMiddleware.js";
 
 const db = new Database(config.database.path);
 
@@ -54,7 +54,20 @@ const init = async () => {
     cors: config.socket.cors,
   });
 
-  io.on("connection", (socket) => {
+  // Authenticate the realtime channel too — broadcasts carry SMS/OTP content, so an
+  // unauthenticated socket would leak them to anyone who connects.
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token;
+      if (!token) return next(new Error("No token provided"));
+      await authenticateToken(token);
+      next();
+    } catch (err) {
+      next(new Error("Invalid token"));
+    }
+  });
+
+  io.on("connection", () => {
     console.log("Client connected");
   });
 
