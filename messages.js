@@ -177,7 +177,10 @@ const init = async () => {
     method: "GET",
     path: "/messages",
     handler: (request, h) => {
-      const { sender, sim } = request.query;
+      // Cursor pagination: returns the newest `limit` messages (default 100). Pass
+      // `before=<id>` to fetch the next older page. Ordered by id (autoincrement) so it's
+      // chronologically correct and stable — the sentStamp string sort was neither.
+      const { sender, sim, limit, before } = request.query;
 
       try {
         let query = `
@@ -197,7 +200,14 @@ const init = async () => {
           params.push(sim);
         }
 
-        query += " ORDER BY sentStamp DESC";
+        if (before) {
+          query += " AND id < ?";
+          params.push(Number(before));
+        }
+
+        const pageSize = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+        query += " ORDER BY id DESC LIMIT ?";
+        params.push(pageSize);
 
         const messages = db.prepare(query).all(params);
 
