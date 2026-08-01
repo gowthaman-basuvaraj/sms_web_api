@@ -1,7 +1,7 @@
 import "dotenv/config";
 import Hapi from "@hapi/hapi";
 import Database from "better-sqlite3";
-import { format, subHours } from "date-fns";
+import { format } from "date-fns";
 import { Server } from "socket.io";
 import cron from "node-cron";
 import config from "./config.js";
@@ -40,6 +40,29 @@ db.prepare(
        mutePreferences BOOLEAN DEFAULT 1,
        FOREIGN KEY (user_id) REFERENCES users (id)
    )`).run();
+
+// Per-sender message retention, in days. A sender only appears here if it has a finite
+// window; the default (no row) is "keep forever". This config is server-side only and is
+// deliberately disjoint from the mobile app's retention settings.
+// language=SQLite
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS sender_retention
+   (
+       sender TEXT PRIMARY KEY,
+       days   INTEGER NOT NULL
+   )`).run();
+
+// Parse a "dd/MM/yyyy HH:mm:ss" sentStamp (written in the server's UTC clock) to epoch ms,
+// or null if it doesn't match. That format doesn't sort lexically by time, so retention
+// compares parsed values rather than strings.
+function parseStamp(stamp) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(
+    String(stamp ?? "")
+  );
+  if (!m) return null;
+  const [, dd, MM, yyyy, HH, mm, ss] = m;
+  return Date.UTC(+yyyy, +MM - 1, +dd, +HH, +mm, +(ss || 0));
+}
 
 const init = async () => {
   const server = Hapi.server({
@@ -407,21 +430,95 @@ const init = async () => {
     },
   });
 
-  // Run every hour to delete messages older than 48 hours
+  // API 8: List per-sender retention windows (only senders with a finite window).
+  server.route({
+    method: "GET",
+    path: "/sender-retention",
+    handler: (req, h) => {
+      try {
+        const rules = db
+          .prepare(`SELECT sender, days FROM sender_retention ORDER BY sender`)
+          .all();
+        return h.response({ status: "success", rules }).code(200);
+      } catch (error) {
+        console.error(error);
+        return h
+          .response({ status: "error", message: "Failed to read retention" })
+          .code(500);
+      }
+    },
+  });
+
+  // API 9: Set a sender's retention window. days > 0 keeps that many days; days <= 0 (or
+  // blank) removes the rule, reverting the sender to the default "keep forever".
+  server.route({
+    method: "POST",
+    path: "/sender-retention",
+    handler: (req, h) => {
+      try {
+        const { sender } = req.payload || {};
+        const days = Number.parseInt(req.payload?.days, 10);
+        if (!sender || typeof sender !== "string") {
+          return h
+            .response({ status: "error", message: "sender is required" })
+            .code(400);
+        }
+        if (Number.isFinite(days) && days > 0) {
+          db.prepare(
+            `INSERT INTO sender_retention (sender, days) VALUES (?, ?)
+             ON CONFLICT(sender) DO UPDATE SET days = excluded.days`
+          ).run(sender, days);
+          return h.response({ status: "success", sender, days }).code(200);
+        }
+        db.prepare(`DELETE FROM sender_retention WHERE sender = ?`).run(sender);
+        return h.response({ status: "success", sender, days: 0 }).code(200);
+      } catch (error) {
+        console.error(error);
+        return h
+          .response({ status: "error", message: "Failed to set retention" })
+          .code(500);
+      }
+    },
+  });
+
+  // Enforce per-sender retention. Only senders with a finite window are touched; everything
+  // else is kept forever (the default). Runs on config.cron.schedule (hourly by default).
   cron.schedule(config.cron.schedule, () => {
-    const cutoffDate = format(
-      subHours(new Date(), config.cron.retentionPeriodHours),
-      "dd/MM/yyyy HH:mm:ss"
-    );
     try {
-      const deleteOldMessages = db.prepare(`
-        DELETE FROM messages
-        WHERE sentStamp < ?
-      `);
-      const result = deleteOldMessages.run(cutoffDate);
-      console.log(`Deleted ${result.changes} old messages`);
+      const rules = db
+        .prepare(`SELECT sender, days FROM sender_retention WHERE days > 0`)
+        .all();
+      if (rules.length === 0) return;
+
+      const now = Date.now();
+      const selectBySender = db.prepare(
+        `SELECT id, sentStamp FROM messages WHERE sender = ?`
+      );
+      let deleted = 0;
+      const purge = db.transaction(() => {
+        for (const { sender, days } of rules) {
+          const cutoff = now - days * 86_400_000;
+          const expired = selectBySender
+            .all(sender)
+            .filter((m) => {
+              const t = parseStamp(m.sentStamp);
+              return t !== null && t < cutoff;
+            })
+            .map((m) => m.id);
+          for (let i = 0; i < expired.length; i += 400) {
+            const chunk = expired.slice(i, i + 400);
+            deleted += db
+              .prepare(
+                `DELETE FROM messages WHERE id IN (${chunk.map(() => "?").join(",")})`
+              )
+              .run(...chunk).changes;
+          }
+        }
+      });
+      purge();
+      if (deleted > 0) console.log(`Retention: deleted ${deleted} message(s)`);
     } catch (error) {
-      console.error("Failed to delete old messages:", error);
+      console.error("Failed to apply retention:", error);
     }
   });
 
