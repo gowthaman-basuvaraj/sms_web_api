@@ -169,7 +169,7 @@ const init = async () => {
       try {
         const query = db.prepare(`
           WITH LatestMessages AS (
-            SELECT sender, MAX(sentStamp) AS LatestTime
+            SELECT sender, MAX(id) AS LatestId
             FROM messages
             GROUP BY sender
           )
@@ -177,8 +177,8 @@ const init = async () => {
                  (SELECT COUNT(*) FROM messages WHERE sender = m.sender AND isRead = 0) AS unreadCount
           FROM messages m
                  JOIN LatestMessages lm
-                      ON m.sender = lm.sender AND m.sentStamp = lm.LatestTime
-          ORDER BY m.sentStamp DESC;
+                      ON m.sender = lm.sender AND m.id = lm.LatestId
+          ORDER BY m.id DESC;
         `);
 
         const messages = query.all();
