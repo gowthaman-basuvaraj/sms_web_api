@@ -481,6 +481,56 @@ const init = async () => {
     },
   });
 
+  // API 10: Delete a sender outright — its messages, every user's mute preference for it,
+  // and its retention rule. Clients are told over the socket so open lists drop it too.
+  server.route({
+    method: "DELETE",
+    path: "/sender",
+    handler: (request, h) => {
+      const { sender } = request.query;
+
+      if (!sender || typeof sender !== "string") {
+        return h
+          .response({ status: "error", message: "sender is required" })
+          .code(400);
+      }
+
+      try {
+        const deleteSender = db.transaction((senderName) => {
+          const messages = db
+            .prepare(`DELETE FROM messages WHERE sender = ?`)
+            .run(senderName).changes;
+          const preferences = db
+            .prepare(`DELETE FROM userPreferences WHERE sender_name = ?`)
+            .run(senderName).changes;
+          const retention = db
+            .prepare(`DELETE FROM sender_retention WHERE sender = ?`)
+            .run(senderName).changes;
+          return { messages, preferences, retention };
+        });
+
+        const deleted = deleteSender(sender);
+
+        if (deleted.messages === 0 && deleted.preferences === 0 && deleted.retention === 0) {
+          return h
+            .response({ status: "error", message: "Sender not found" })
+            .code(404);
+        }
+
+        io.emit("senderDeleted", { sender });
+
+        return h
+          .response({ status: "success", message: "Sender deleted", deleted })
+          .code(200);
+      } catch (error) {
+        console.error(error);
+        return h
+          .response({ status: "error", message: "Failed to delete sender" })
+          .code(500);
+      }
+    },
+  });
+
   // Enforce per-sender retention. Only senders with a finite window are touched; everything
   // else is kept forever (the default). Runs on config.cron.schedule (hourly by default).
   cron.schedule(config.cron.schedule, () => {

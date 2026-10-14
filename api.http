@@ -26,3 +26,7 @@ GET http://localhost:3000/messages?from=Ashwin&sim=Jio
 
 
 
+
+### Delete a sender (messages, mute preferences, retention rule)
+DELETE http://localhost:3000/sender?sender=IM-AXISBK
+Authorization: Bearer {{token}}
